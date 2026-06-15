@@ -30,13 +30,8 @@ public class Conversation {
     private String senderId;
     private String senderName;
     private String recipientId;
-
     @Enumerated(EnumType.STRING)
     private ConversationStatus status;
-
-    private String category;
-    private String sentiment;
-    private BigDecimal confidence;
 
     private Long assignedAgentId;
     private Long handedOverByAgentId;
