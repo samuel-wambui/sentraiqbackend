@@ -30,12 +30,12 @@ public class JpaRegisteredClientRepositoryImpl implements RegisteredClientReposi
 
     @Override
     public RegisteredClient findById(String id) {
-        return repo.findById(id).map(this::toRegisteredClient).orElse(null);
+        return repo.findByIdAndDeletedFalse(id).map(this::toRegisteredClient).orElse(null);
     }
 
     @Override
     public RegisteredClient findByClientId(String clientId) {
-        return repo.findByClientId(clientId).map(this::toRegisteredClient).orElse(null);
+        return repo.findByClientIdAndDeletedFalse(clientId).map(this::toRegisteredClient).orElse(null);
     }
 
     private RegisteredClient toRegisteredClient(RegisteredClientEntity e) {
