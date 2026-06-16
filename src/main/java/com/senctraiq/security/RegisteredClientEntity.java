@@ -47,5 +47,20 @@ public class RegisteredClientEntity {
 
     @Column(name = "token_settings", columnDefinition = "text")
     private String tokenSettings;
-}
 
+    @Column(name = "modified_by")
+    private String modifiedBy;
+
+    @Column(name = "modified_time")
+    private Instant modifiedTime;
+
+    @Column(name = "deleted_by")
+    private String deletedBy;
+
+    @Column(name = "deleted_time")
+    private Instant deletedTime;
+
+    @Builder.Default
+    @Column(name = "deleted", nullable = false)
+    private boolean deleted = false;
+}

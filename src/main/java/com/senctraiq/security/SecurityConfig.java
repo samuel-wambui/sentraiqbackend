@@ -131,6 +131,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/roles/create", "/api/roles/update/**", "/api/roles/delete/**")
                         .hasAnyAuthority("SUPERUSER")
+                        .requestMatchers("/api/oauth2/clients", "/api/oauth2/clients/**")
+                        .hasAnyAuthority("SUPERUSER")
                         .requestMatchers("/api/users/**", "/api/roles/getAllRoles", "/api/roles/assignRole", "/api/roles/removeRole")
                         .hasAnyAuthority("ADMIN", "SUPERUSER")
                         .requestMatchers(
@@ -144,7 +146,6 @@ public class SecurityConfig {
                                 "/api/leaves/**", "/ws-notifications/**","/api/users/notifications/**",
                                 "/api/conversations/**", "/oauth2/authorize"
                         ).permitAll()
-                        .requestMatchers("/api/oauth2/clients/**").hasAnyAuthority("ADMIN", "SUPERUSER")
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(provider)
