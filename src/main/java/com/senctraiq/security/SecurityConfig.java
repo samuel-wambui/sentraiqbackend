@@ -144,7 +144,7 @@ public class SecurityConfig {
                                 "api/oauth2/**", "/.well-known/**", "/userinfo", "/api/escalations/**",
                                 "/api/resolved-escalation/workflow/**",
                                 "/api/leaves/**", "/ws-notifications/**","/api/users/notifications/**",
-                                "/api/conversations/**", "/oauth2/authorize"
+                                "/api/conversations/**", "/oauth2/authorize","/api/v1/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
@@ -158,10 +158,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);
-        config.setAllowedOriginPatterns(List.of(
-                "http://localhost:*",
-                "http://127.0.0.1:*"
-        ));
+        config.setAllowedOriginPatterns(List.of("*"));
         config.setAllowedHeaders(List.of("Authorization", "Cache-Control", "Content-Type", "X-Requested-With"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setExposedHeaders(List.of("Authorization", "Set-Cookie"));
