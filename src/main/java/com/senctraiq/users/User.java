@@ -50,6 +50,8 @@ public class User {
     private boolean deleted = false;
     private boolean verified;
     private boolean locked;
+    @Column(name = "force_password_change", nullable = false)
+    private boolean forcePasswordChange = false;
     @Column(name = "logged_in")
     private Boolean loggedIn = false;
     @Column(name = "on_leave")

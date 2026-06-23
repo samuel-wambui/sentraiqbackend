@@ -15,5 +15,7 @@ public interface SentimentsRepository extends JpaRepository<Sentiments, Long> {
         return findAllByMessageIdOrderByIdDesc(messageId).stream().findFirst();
     }
 
+    List<Sentiments> findAllByMessageIdInOrderByIdDesc(List<String> messageIds);
+
     List<Sentiments> findByCategory(String category);
 }

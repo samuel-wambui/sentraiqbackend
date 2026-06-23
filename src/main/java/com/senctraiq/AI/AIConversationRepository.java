@@ -19,10 +19,11 @@ public interface AIConversationRepository extends JpaRepository<AIConversation, 
     @Query("SELECT a FROM AIConversation a WHERE a.deleted = false AND a.messageId = ?1")
     Optional<AIConversation> findActiveByMessageId(String messageId);
 
+    List<AIConversation> findAllByMessageIdInAndDeletedOrderByLastRepliedAtAscIdAsc(List<String> messageIds, boolean deleted);
+
     @Query("SELECT a FROM AIConversation a WHERE a.deleted = false AND a.handedOverByAI = true")
     List<AIConversation> findActiveHandedOverConversations();
 
     @Query("SELECT a FROM AIConversation a WHERE a.deleted = false AND a.handedOverByAI = false")
     List<AIConversation> findActiveOngoingConversations();
 }
-

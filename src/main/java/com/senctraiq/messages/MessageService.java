@@ -16,8 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -35,11 +37,13 @@ public class MessageService {
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final LocalDateTime OLDEST_ACCEPTED_PAYLOAD_TIME = LocalDateTime.of(2000, 1, 1, 0, 0);
 
     @Transactional
     public Message createMessage(AiFullConversationDTO requestDTO) {
         rejectDuplicateMessage(requestDTO.getCustomerMessageId());
         LocalDateTime now = LocalDateTime.now();
+        rejectOutboundEcho(requestDTO.getSource(), requestDTO.getSenderId(), requestDTO.getRecipientId(), now);
         LocalDateTime activeFrom = now.minusHours(48);
         LocalDateTime receivedAt = parsePayloadTime(requestDTO.getReceivedAt(), now);
         LocalDateTime repliedAt = parsePayloadTime(requestDTO.getRepliedAt(), receivedAt);
@@ -51,9 +55,12 @@ public class MessageService {
         message.setSenderId(requestDTO.getSenderId());
         message.setSenderName(requestDTO.getSenderName());
         message.setRecipientId(requestDTO.getRecipientId());
+        message.setSenderType("CUSTOMER");
         message.setReply(requestDTO.getAgentAnswer());
         message.setRepliedBy("AI");
-        createAIConversation(message);
+        message.setRepliedByUsername("AI");
+        message.setRepliedByFirstName("AI");
+        createAIConversation(message, repliedAt);
 
         if (activeTicket.isPresent()) {
             message.setConversationContinuation(true);
@@ -78,6 +85,7 @@ public class MessageService {
     public Message createConversationCont(ConversationContinuationDTO requestDTO) {
         rejectDuplicateMessage(requestDTO.getCustomerMessageId());
         LocalDateTime now = LocalDateTime.now();
+        rejectOutboundEcho(requestDTO.getSource(), requestDTO.getSenderId(), requestDTO.getRecipientId(), now);
         Optional<Ticket> activeTicket = findActiveTicketBySenderId(requestDTO.getSenderId());
 
         Message message = new Message();
@@ -86,6 +94,7 @@ public class MessageService {
         message.setSenderId(requestDTO.getSenderId());
         message.setSenderName(requestDTO.getSenderName());
         message.setRecipientId(requestDTO.getRecipientId());
+        message.setSenderType("CUSTOMER");
         message.setMessage(requestDTO.getCustomerMessage());
         message.setConversationContinuation(activeTicket.isPresent());
         message.setCreatedAt(now);
@@ -98,21 +107,21 @@ public class MessageService {
         return messagesRepository.save(message);
     }
 
-    public void createTicket(Message message, LocalDateTime createdAt, LocalDateTime updatedAt) {
+    public Ticket createTicket(Message message, LocalDateTime createdAt, LocalDateTime updatedAt) {
         Ticket ticket = new Ticket();
         ticket.setTicketNumber(generateTicketNumber());
         ticket.setMessageId(message.getMessageId());
         ticket.setSenderId(message.getSenderId());
         ticket.setTicketCreatedAt(createdAt);
         ticket.setTicketUpdatedAt(updatedAt);
-        ticketRepo.save(ticket);
+        return ticketRepo.save(ticket);
     }
 
 
-    public void createAIConversation(Message message) {
+    public void createAIConversation(Message message, LocalDateTime repliedAt) {
         AIConversation aiConversation = new AIConversation();
         aiConversation.setMessageId(message.getMessageId());
-        aiConversation.setLastRepliedAt(LocalDateTime.now());
+        aiConversation.setLastRepliedAt(repliedAt != null ? repliedAt : LocalDateTime.now());
         aiConversation.setHandedOverByAI(false);
         aiConversation.setDeleted(false);
         aiConversationRepository.save(aiConversation);
@@ -123,6 +132,8 @@ public class MessageService {
         rejectDuplicateMessage(requestDTO.getMessageId());
         Message message = new Message();
         LocalDateTime now = LocalDateTime.now();
+        rejectOutboundEcho(requestDTO.getSource(), requestDTO.getSenderId(), requestDTO.getRecipientId(), now);
+        LocalDateTime createdAt = parsePayloadTime(requestDTO.getReceivedAt(), now);
         Optional<Ticket> activeTicket = findActiveTicketBySenderId(requestDTO.getSenderId(), now.minusHours(48));
         if (activeTicket.isPresent()) {
             message.setSource(requestDTO.getSource());
@@ -130,9 +141,10 @@ public class MessageService {
             message.setSenderId(requestDTO.getSenderId());
             message.setSenderName(requestDTO.getSenderName());
             message.setRecipientId(requestDTO.getRecipientId());
+            message.setSenderType("CUSTOMER");
             message.setMessage(requestDTO.getMessage());
-            message.setCreatedAt(requestDTO.getReceivedAt());
-            updateTicket(activeTicket.get());
+            message.setCreatedAt(createdAt);
+            markTicketHandedOverByAi(activeTicket.get(), now);
             message.setConversationContinuation(true);
         } else {
             message.setSource(requestDTO.getSource());
@@ -140,13 +152,14 @@ public class MessageService {
             message.setSenderId(requestDTO.getSenderId());
             message.setSenderName(requestDTO.getSenderName());
             message.setRecipientId(requestDTO.getRecipientId());
+            message.setSenderType("CUSTOMER");
             message.setMessage(requestDTO.getMessage());
-            message.setCreatedAt(requestDTO.getReceivedAt());
-            createTicket(message, requestDTO.getReceivedAt(), now);
+            message.setCreatedAt(createdAt);
+            Ticket ticket = createTicket(message, createdAt, now);
+            markTicketHandedOverByAi(ticket, now);
             message.setConversationContinuation(false);
         }
         createSentiment(requestDTO.getMessageId(), requestDTO.getCategory(), requestDTO.getSentiment());
-        message.setCreatedAt(now);
         return messagesRepository.save(message);
     }
 
@@ -215,10 +228,53 @@ public class MessageService {
         ticketRepo.save(ticket);
     }
 
+    private void markTicketHandedOverByAi(Ticket ticket, LocalDateTime handoverTime) {
+        ticket.setTicketHandedOver(true);
+        ticket.setTicketHandoverBy("AI");
+        ticket.setTicketHandoverTime(handoverTime);
+        ticket.setTicketUpdatedAt(handoverTime);
+        ticketRepo.save(ticket);
+    }
+
     private void rejectDuplicateMessage(String messageId) {
         if (messageId != null && messagesRepository.existsByMessageId(messageId)) {
             throw new DuplicateMessageException(messageId);
         }
+    }
+
+    private void rejectOutboundEcho(String source, String senderId, String recipientId, LocalDateTime referenceTime) {
+        if (isBlank(source) || isBlank(senderId) || isBlank(recipientId)) {
+            return;
+        }
+
+        Optional<Ticket> customerTicket = findActiveTicketBySenderId(recipientId, referenceTime.minusHours(48));
+        if (customerTicket.isEmpty()) {
+            return;
+        }
+
+        LocalDateTime startAt = customerTicket.get().getTicketCreatedAt();
+        if (startAt == null || startAt.isAfter(referenceTime.plusMinutes(5))) {
+            startAt = referenceTime.minusHours(48);
+        }
+
+        List<Message> threadMessages = messagesRepository.findTicketMessagesBySenderIdSince(recipientId, startAt);
+        boolean senderIsKnownChannelAccount = threadMessages.stream()
+                .anyMatch(message ->
+                        sameValue(source, message.getSource())
+                                && sameValue(senderId, message.getRecipientId())
+                );
+
+        if (senderIsKnownChannelAccount) {
+            throw new OutboundEchoMessageException(senderId, recipientId);
+        }
+    }
+
+    private boolean sameValue(String first, String second) {
+        return first != null && second != null && first.trim().equalsIgnoreCase(second.trim());
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     private LocalDateTime parsePayloadTime(String value, LocalDateTime fallback) {
@@ -227,15 +283,29 @@ public class MessageService {
         }
         String normalized = value.trim();
         try {
-            return LocalDateTime.parse(normalized, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+            return normalizePayloadTime(LocalDateTime.parse(normalized, DateTimeFormatter.ISO_LOCAL_DATE_TIME), fallback);
         } catch (DateTimeParseException ignored) {
             // Try offset/Z timestamps sent by n8n and browser clients.
         }
 
         try {
-            return OffsetDateTime.parse(normalized, DateTimeFormatter.ISO_OFFSET_DATE_TIME).toLocalDateTime();
+            LocalDateTime parsed = OffsetDateTime.parse(normalized, DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+                    .atZoneSameInstant(ZoneId.systemDefault())
+                    .toLocalDateTime();
+            return normalizePayloadTime(parsed, fallback);
         } catch (DateTimeParseException ignored) {
             return fallback;
         }
+    }
+
+    private LocalDateTime normalizePayloadTime(LocalDateTime parsed, LocalDateTime fallback) {
+        if (parsed == null) {
+            return fallback;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        if (parsed.isAfter(now.plusMinutes(5)) || parsed.isBefore(OLDEST_ACCEPTED_PAYLOAD_TIME)) {
+            return fallback;
+        }
+        return parsed;
     }
 }

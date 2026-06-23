@@ -44,5 +44,67 @@ public interface MessagesRepository extends JpaRepository<Message, Long> {
             @Param("activeFrom") LocalDateTime activeFrom
     );
 
+    @Query("""
+    SELECT m FROM Message m
+    WHERE m.deleted = false
+      AND (m.senderId = :senderId OR m.recipientId = :senderId)
+      AND m.createdAt >= :startAt
+    ORDER BY m.createdAt ASC, m.id ASC
+""")
+    List<Message> findTicketMessagesBySenderIdSince(
+            @Param("senderId") String senderId,
+            @Param("startAt") LocalDateTime startAt
+    );
+
+    @Query("""
+    SELECT m FROM Message m
+    WHERE m.deleted = false
+      AND (m.senderId = :senderId OR m.recipientId = :senderId)
+      AND m.createdAt >= :startAt
+      AND m.createdAt <= :endAt
+    ORDER BY m.createdAt ASC, m.id ASC
+""")
+    List<Message> findTicketMessagesBySenderIdBetween(
+            @Param("senderId") String senderId,
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endAt") LocalDateTime endAt
+    );
+
+    @Query("""
+    SELECT m FROM Message m
+    WHERE m.deleted = false
+      AND m.messageId = :messageId
+    ORDER BY m.createdAt ASC, m.id ASC
+""")
+    List<Message> findActiveByMessageId(@Param("messageId") String messageId);
+
+
+    @Query("""
+    SELECT m FROM Message m
+    WHERE m.deleted = false
+      AND m.senderId = :senderId
+      AND m.createdAt >= :startAt
+      AND (m.senderType IS NULL OR UPPER(m.senderType) <> 'AGENT')
+    ORDER BY m.createdAt DESC, m.id DESC
+""")
+    List<Message> findTicketCustomerMessagesBySenderIdSince(
+            @Param("senderId") String senderId,
+            @Param("startAt") LocalDateTime startAt
+    );
+
+    @Query("""
+    SELECT m FROM Message m
+    WHERE m.deleted = false
+      AND m.senderId = :senderId
+      AND m.createdAt >= :startAt
+      AND m.createdAt <= :endAt
+      AND (m.senderType IS NULL OR UPPER(m.senderType) <> 'AGENT')
+    ORDER BY m.createdAt DESC, m.id DESC
+""")
+    List<Message> findTicketCustomerMessagesBySenderIdBetween(
+            @Param("senderId") String senderId,
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endAt") LocalDateTime endAt
+    );
 
 }

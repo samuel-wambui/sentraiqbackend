@@ -10,6 +10,16 @@ import java.util.List;
 import java.util.Optional;
 
 public interface TicketRepo extends JpaRepository<Ticket, Long> {
+    List<Ticket> findAllByTicketDeletedOrderByTicketUpdatedAtDescIdDesc(boolean ticketDeleted);
+
+    List<Ticket> findAllByTicketDeletedAndTicketClosedOrderByTicketUpdatedAtDescIdDesc(boolean ticketDeleted, boolean ticketClosed);
+
+    List<Ticket> findAllByTicketDeletedAndTicketClosedAndTicketHandedOverOrderByTicketUpdatedAtDescIdDesc(
+            boolean ticketDeleted,
+            boolean ticketClosed,
+            boolean ticketHandedOver
+    );
+
     Optional<Ticket> findFirstByTicketNumberAndTicketDeletedOrderByTicketUpdatedAtDescIdDesc(String ticketNumber, boolean ticketDeleted);
 
     default Optional<Ticket> findByTicketNumberAndTicketDeleted(String ticketNumber, boolean ticketDeleted) {

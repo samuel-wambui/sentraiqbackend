@@ -1,10 +1,12 @@
 package com.senctraiq.users;
 
 import com.senctraiq.ApiResponse.ApiResponse;
+import com.senctraiq.Authentication.PasswordResetService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,6 +20,7 @@ public class UserController {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final PasswordResetService passwordResetService;
 
     @GetMapping("/getAllUsers")
     public ResponseEntity<ApiResponse<List<User>>> getAllUsers() {
@@ -82,10 +85,61 @@ public class UserController {
         return ResponseEntity.ok(new ApiResponse<>("User suspended successfully", HttpStatus.OK.value(), savedUser));
     }
 
+    @PutMapping("/{userId}/unlock")
+    public ResponseEntity<ApiResponse<User>> unlockUser(@PathVariable Long userId) {
+        User user = getActiveUser(userId);
+        passwordResetService.unlockUserWithTemporaryPassword(user);
+
+        User unlockedUser = getActiveUser(userId);
+        return ResponseEntity.ok(new ApiResponse<>(
+                "User unlocked and temporary password sent to their email",
+                HttpStatus.OK.value(),
+                unlockedUser
+        ));
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @RequestBody ChangePasswordRequest request,
+            Authentication authentication
+    ) {
+        if (authentication == null || !authentication.isAuthenticated() || isBlank(authentication.getName())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ApiResponse<>("Authentication is required", HttpStatus.UNAUTHORIZED.value(), null));
+        }
+
+        User user = userRepository.findByUsernameAndDeleted(authentication.getName(), false)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        String validationMessage = validatePasswordChangeRequest(request);
+        if (validationMessage != null) {
+            return ResponseEntity.badRequest()
+                    .body(new ApiResponse<>(validationMessage, HttpStatus.BAD_REQUEST.value(), null));
+        }
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            return ResponseEntity.badRequest()
+                    .body(new ApiResponse<>("Current password is incorrect", HttpStatus.BAD_REQUEST.value(), null));
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setForcePasswordChange(false);
+        user.setLocked(false);
+        userRepository.save(user);
+
+        return ResponseEntity.ok(new ApiResponse<>("Password changed successfully", HttpStatus.OK.value(), null));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Void>> handleValidationError(IllegalArgumentException error) {
         return ResponseEntity.badRequest()
                 .body(new ApiResponse<>(error.getMessage(), HttpStatus.BAD_REQUEST.value(), null));
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiResponse<Void>> handleServerError(IllegalStateException error) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ApiResponse<>(error.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR.value(), null));
     }
 
     private User getActiveUser(Long userId) {
@@ -135,6 +189,22 @@ public class UserController {
         return isBlank(value) ? null : value.trim();
     }
 
+    private String validatePasswordChangeRequest(ChangePasswordRequest request) {
+        if (request == null
+                || isBlank(request.getCurrentPassword())
+                || isBlank(request.getNewPassword())
+                || isBlank(request.getConfirmPassword())) {
+            return "Current password, new password, and confirmation are required";
+        }
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            return "New password and confirmation must match";
+        }
+        if (request.getNewPassword().length() < 6) {
+            return "Password must be at least 6 characters long";
+        }
+        return null;
+    }
+
     @Data
     public static class UserRequest {
         private String username;
@@ -143,5 +213,13 @@ public class UserController {
         private String lastName;
         private String email;
         private String password;
+    }
+
+    @Data
+    public static class ChangePasswordRequest {
+        private String username;
+        private String currentPassword;
+        private String newPassword;
+        private String confirmPassword;
     }
 }

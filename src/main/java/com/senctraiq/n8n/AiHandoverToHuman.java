@@ -16,6 +16,6 @@ public class AiHandoverToHuman {
     private Boolean handedOverFromAiAgent;
     private String category;
     private String sentiment;
-    private LocalDateTime receivedAt;
+    private String receivedAt;
 
 }

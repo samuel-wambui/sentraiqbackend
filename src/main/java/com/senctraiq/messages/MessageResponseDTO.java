@@ -17,10 +17,13 @@ public class MessageResponseDTO {
     private String senderId;
     private String senderName;
     private String recipientId;
+    private String senderType;
     private String message;
     private String reply;
     private boolean isConversationContinuation;
     private String repliedBy;
+    private String repliedByUsername;
+    private String repliedByFirstName;
     private String category;
     private String sentiment;
     private String ticketNumber;
@@ -28,4 +31,3 @@ public class MessageResponseDTO {
     private LocalDateTime createdAt;
     private boolean deleted;
 }
-

@@ -41,6 +41,8 @@ public class MessageController {
             apiResponse.setEntity(responseDTO);
 
             return ResponseEntity.status(HttpStatus.CREATED).body(apiResponse);
+        } catch (OutboundEchoMessageException ex) {
+            return ignoredOutboundEchoResponse(ex);
         } catch (DuplicateMessageException ex) {
             return duplicateMessageResponse(ex);
         }
@@ -60,6 +62,8 @@ public class MessageController {
             apiResponse.setEntity(responseDTO);
 
             return ResponseEntity.status(HttpStatus.CREATED).body(apiResponse);
+        } catch (OutboundEchoMessageException ex) {
+            return ignoredOutboundEchoResponse(ex);
         } catch (DuplicateMessageException ex) {
             return duplicateMessageResponse(ex);
         }
@@ -73,6 +77,14 @@ public class MessageController {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(apiResponse);
     }
 
+    private <T> ResponseEntity<ApiResponse<T>> ignoredOutboundEchoResponse(OutboundEchoMessageException ex) {
+        ApiResponse<T> apiResponse = new ApiResponse<>();
+        apiResponse.setMessage(ex.getMessage());
+        apiResponse.setStatusCode(HttpStatus.OK.value());
+        apiResponse.setEntity(null);
+        return ResponseEntity.ok(apiResponse);
+    }
+
     @PostMapping("/hand-over-from-ai")
     public ResponseEntity<ApiResponse<Message>> handledOverFromAi  (@RequestBody AiHandoverToHuman requestDTO) {
         ApiResponse<Message> apiResponse = new ApiResponse<>();
@@ -82,6 +94,11 @@ public class MessageController {
             apiResponse.setStatusCode(201);
             apiResponse.setEntity(savedMessage);
             return ResponseEntity.status(HttpStatus.CREATED).body(apiResponse);
+        } catch (OutboundEchoMessageException ex) {
+            apiResponse.setMessage(ex.getMessage());
+            apiResponse.setStatusCode(HttpStatus.OK.value());
+            apiResponse.setEntity(null);
+            return ResponseEntity.ok(apiResponse);
         } catch (DuplicateMessageException ex) {
             apiResponse.setMessage(ex.getMessage());
             apiResponse.setStatusCode(HttpStatus.CONFLICT.value());
@@ -104,6 +121,7 @@ public class MessageController {
         dto.setSenderId(message.getSenderId());
         dto.setSenderName(message.getSenderName());
         dto.setRecipientId(message.getRecipientId());
+        dto.setSenderType(message.getSenderType());
         dto.setMessage(message.getMessage());
         dto.setReply(message.getReply());
         Optional<Ticket> optionalTicket = findResponseTicket(message, ticketNumberHint);
@@ -115,6 +133,8 @@ public class MessageController {
         });
         dto.setConversationContinuation(message.isConversationContinuation());
         dto.setRepliedBy(message.getRepliedBy());
+        dto.setRepliedByUsername(message.getRepliedByUsername());
+        dto.setRepliedByFirstName(message.getRepliedByFirstName());
         dto.setRepliedAt(message.getRepliedAt());
         dto.setCreatedAt(message.getCreatedAt());
         dto.setDeleted(message.isDeleted());

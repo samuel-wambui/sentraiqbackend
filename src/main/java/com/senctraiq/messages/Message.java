@@ -27,12 +27,15 @@ public class Message {
     private String senderId;
     private String senderName;
     private String recipientId;
+    private String senderType;
     @Column(columnDefinition = "TEXT")
     private String message;
     @Column(columnDefinition = "TEXT")
     private String reply;
     private boolean isConversationContinuation=false;
     private String repliedBy;
+    private String repliedByUsername;
+    private String repliedByFirstName;
     private LocalDateTime repliedAt;
     private LocalDateTime createdAt;
     private boolean deleted=false;

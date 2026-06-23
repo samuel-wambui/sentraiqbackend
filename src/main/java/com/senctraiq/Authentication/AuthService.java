@@ -33,6 +33,7 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
     private final UserRepository userRepository;
+    private final PasswordResetService passwordResetService;
 
     // In-memory tracker for failed attempts. Thread-safe.
     private final ConcurrentMap<String, Integer> failedAttempts = new ConcurrentHashMap<>();
@@ -62,6 +63,23 @@ public class AuthService {
             );
 
             failedAttempts.remove(username);
+
+            if (user.isForcePasswordChange()) {
+                String passwordChangeToken = passwordResetService.createTemporaryPasswordChallenge(user);
+                user.setLoggedIn(false);
+                userRepository.save(user);
+
+                LoginResponse response = LoginResponse.passwordChangeRequired(
+                        user.getUsername(),
+                        user.getFirstName(),
+                        user.getEmail(),
+                        user.getLastName(),
+                        passwordChangeToken
+                );
+
+                return new ApiResponse<>("Temporary password accepted. Please choose a new password.", 200, response);
+            }
+
             user.setLoggedIn(true);
             if (user.isLocked()) {
                 user.setLocked(false);

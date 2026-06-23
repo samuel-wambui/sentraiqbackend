@@ -6,6 +6,7 @@ import com.senctraiq.security.jwt.TokenRefreshRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final PasswordResetService passwordResetService;
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginResponse>> login(
@@ -45,5 +47,35 @@ public class AuthController {
     ) {
         ApiResponse<Void> response = authService.logout(username, httpServletRequest);
         return ResponseEntity.status(response.getStatusCode()).body(response);
+    }
+
+    @PostMapping("/password-reset/request")
+    public ResponseEntity<ApiResponse<Void>> requestPasswordReset(
+            @RequestBody PasswordResetRequest request
+    ) {
+        ApiResponse<Void> response = passwordResetService.requestPasswordReset(request);
+        return ResponseEntity.status(response.getStatusCode()).body(response);
+    }
+
+    @PostMapping("/password-reset/confirm")
+    public ResponseEntity<ApiResponse<Void>> confirmPasswordReset(
+            @RequestBody PasswordResetConfirmRequest request
+    ) {
+        ApiResponse<Void> response = passwordResetService.confirmPasswordReset(request);
+        return ResponseEntity.status(response.getStatusCode()).body(response);
+    }
+
+    @PostMapping("/temporary-password/complete")
+    public ResponseEntity<ApiResponse<Void>> completeTemporaryPasswordChange(
+            @RequestBody PasswordResetConfirmRequest request
+    ) {
+        ApiResponse<Void> response = passwordResetService.completeTemporaryPasswordChange(request);
+        return ResponseEntity.status(response.getStatusCode()).body(response);
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiResponse<Void>> handleServerError(IllegalStateException error) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ApiResponse<>(error.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR.value(), null));
     }
 }
